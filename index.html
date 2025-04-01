@@ -2,7 +2,25 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Make it responsive and prevent zooming -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+    <!-- PWA & Mobile App Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"> <!-- Or "default" or "black" -->
+    <meta name="apple-mobile-web-app-title" content="Gemma Chat">
+    <meta name="application-name" content="Gemma Chat">
+    <meta name="theme-color" content="#0d6efd"> <!-- Match manifest theme_color -->
+
+    <!-- Link to Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Icons (replace with your actual icon paths) -->
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png"> <!-- Typically 180x180 -->
+
+
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <title>Gemma Chat</title>
     <style>
@@ -14,366 +32,300 @@
         }
 
         html {
-            height: 100%; /* Ensure html takes full height */
+            height: 100%;
+            /* Prevent pull-to-refresh slightly */
+            overscroll-behavior-y: contain;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh; /* Use min-height for flexibility */
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'; /* System fonts */
+            height: 100%; /* Full viewport height */
             display: flex;
-            justify-content: center;
-            align-items: center;
+            flex-direction: column; /* Stack header, body, footer vertically */
             background: #e9ecef;
-            transition: background 0.3s ease;
-            padding: 10px; /* Padding for small screens / edges */
-            line-height: 1.4; /* Base line-height */
+            color: #212529;
+            transition: background 0.3s ease, color 0.3s ease;
+            line-height: 1.4;
+            overflow: hidden; /* Prevent body scrolling */
         }
 
         /* --- Theme: Dark Mode --- */
         body.dark {
             background: #212529;
-            color: #f8f9fa; /* Set base dark mode text color */
-        }
-
-        .dark .chat-wrapper {
-            background: #343a40;
             color: #f8f9fa;
         }
+        .dark .chat-wrapper { background: #212529; /* Match body */ }
+        .dark .chat-header { background: #343a40; border-bottom-color: #495057; }
+        .dark .chat-footer { background: #343a40; border-top-color: #495057; }
+        .dark .ai-msg { background: #495057; color: #f8f9fa; border-color: #6c757d; }
+        .dark .ai-msg code, .dark .ai-msg pre { background: #6c757d; }
+        .dark input[type="text"], .dark #api-key-input { background: #495057; color: #f8f9fa; border-color: #6c757d; }
+        .dark button { /* Ensure buttons visible in dark mode */ }
+        .dark .thinking { background: #495057; } /* Give thinking a bg */
+        .dark .dot { background: #dee2e6; } /* Lighter dots */
 
-        .dark .chat-header,
-        .dark .api-section {
-            border-bottom-color: #495057;
-        }
 
-        .dark .chat-footer {
-            border-top-color: #495057;
-            background: #343a40;
-        }
-
-        .dark .ai-msg {
-            background: #495057;
-            color: #f8f9fa;
-            border-color: #6c757d;
-        }
-
-        .dark .ai-msg code {
-            background: #6c757d;
-        }
-
-        .dark input[type="text"],
-        .dark #api-key-input {
-            background: #495057;
-            color: #f8f9fa;
-            border-color: #6c757d;
-        }
-
-        /* --- Layout: Chat Wrapper --- */
+        /* --- Layout: Chat Wrapper (Now the main layout container) --- */
+        /* The .chat-wrapper is less important now, body handles the main layout */
         .chat-wrapper {
-            width: 90%;
-            max-width: 800px;
-            height: 75vh; /* Adjusted height for better fit */
-            max-height: 800px; /* Added max-height */
-            background: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
             display: flex;
             flex-direction: column;
-            overflow: hidden;
-            transition: background 0.3s ease, color 0.3s ease;
+            flex-grow: 1; /* Takes up all space in the body flex container */
+            overflow: hidden; /* Redundant due to body, but safe */
+            height: 100%; /* Ensure it fills the body */
         }
 
-        /* --- Components: Header --- */
+        /* --- Components: Header (Fixed/Sticky) --- */
         .chat-header {
             padding: 10px 15px;
             border-bottom: 1px solid #dee2e6;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap; /* Allow wrapping on small screens */
-            gap: 8px; /* Slightly increased gap */
-            flex-shrink: 0; /* Prevent header from shrinking */
+            flex-wrap: wrap;
+            gap: 8px;
+            flex-shrink: 0; /* Prevent shrinking */
+            position: sticky; /* Keep at top */
+            top: 0;
+            background: #ffffff; /* Needs explicit background */
+            z-index: 10; /* Above scrolling content */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Optional shadow */
         }
+        .dark .chat-header { background: #343a40; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+
 
         .chat-header h1 {
-            font-size: 1.2rem;
+            font-size: 1.1rem; /* Slightly smaller for app feel */
             font-weight: 600;
         }
 
         .controls {
             display: flex;
             gap: 5px;
-            flex-wrap: wrap; /* Allow controls to wrap */
+            flex-wrap: wrap;
         }
 
-        /* --- Components: API Key Section --- */
-        .api-section {
-            padding: 10px 15px;
-            border-bottom: 1px solid #dee2e6;
-            display: flex;
-            gap: 5px;
-            align-items: center;
-            flex-wrap: wrap; /* Allow wrapping */
-            flex-shrink: 0; /* Prevent section from shrinking */
-        }
-
-        /* --- Components: Chat Body & Messages --- */
+        /* --- Components: Chat Body (Scrollable) --- */
         .chat-body {
-            flex-grow: 1; /* Allow body to take available space */
-            padding: 15px;
-            overflow-y: auto;
+            flex-grow: 1; /* Takes available space between header/footer */
+            padding: 15px 15px 5px 15px; /* Add padding bottom to avoid footer overlap */
+            overflow-y: auto; /* Enable vertical scrolling ONLY here */
             scroll-behavior: smooth;
+            overscroll-behavior-y: contain; /* Prevent overscroll effects */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
         }
 
+        /* --- Components: Messages --- */
         .message {
             margin: 8px 0;
             padding: 8px 12px;
-            border-radius: 8px;
+            border-radius: 12px; /* Slightly more rounded */
             max-width: 80%;
-            line-height: 1.4;
+            line-height: 1.45; /* Slightly more spacing */
             animation: fadeIn 0.3s ease;
-            font-size: 0.9rem;
-            word-wrap: break-word; /* Ensure long words break */
+            font-size: 0.95rem; /* Slightly larger for readability */
+            word-wrap: break-word;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* Subtle shadow */
         }
+        .dark .message { box-shadow: none; }
 
         .user-msg {
             background: #0d6efd;
             color: #fff;
             margin-left: auto;
-            text-align: right; /* Align user text right */
+            text-align: right;
+            border-bottom-right-radius: 4px; /* Common chat bubble style */
         }
+        .dark .user-msg { background: #0b5ed7; } /* Slightly adjusted dark blue */
+
 
         .ai-msg {
             background: #f1f3f5;
             color: #212529;
-            border: 1px solid #dee2e6;
-            margin-right: auto; /* Ensure AI messages align left */
-            text-align: left; /* Align AI text left */
+            /* Remove border for cleaner look */
+            /* border: 1px solid #dee2e6; */
+            margin-right: auto;
+            text-align: left;
+            border-bottom-left-radius: 4px; /* Common chat bubble style */
+        }
+        .dark .ai-msg {
+            background: #495057;
+            color: #f8f9fa;
         }
 
-        /* Markdown Styles within AI messages */
-        .ai-msg p:last-child {
-            margin-bottom: 0; /* Remove bottom margin from last paragraph */
-        }
+        /* Markdown Styles */
+        .ai-msg p:last-child { margin-bottom: 0; }
         .ai-msg p { margin: 0 0 8px; }
-        .ai-msg ul,
-        .ai-msg ol { margin: 0 0 8px 20px; padding-left: 10px;} /* Added padding-left */
+        .ai-msg ul, .ai-msg ol { margin: 5px 0 8px 20px; padding-left: 15px; }
         .ai-msg li { margin: 4px 0; }
-        .ai-msg strong { font-weight: 700; }
+        .ai-msg strong { font-weight: 600; } /* Slightly less bold */
         .ai-msg em { font-style: italic; }
         .ai-msg code {
-            background: #e9ecef;
-            padding: 2px 4px;
+            background: #e0e0e0; /* Slightly darker code bg */
+            padding: 2px 5px;
             border-radius: 4px;
-            font-family: 'Courier New', Courier, monospace; /* Consistent monospace font */
-            font-size: 0.85em; /* Slightly smaller code font */
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; /* Monospace fonts */
+            font-size: 0.88em;
         }
-        .ai-msg pre { /* Style for code blocks */
+        .ai-msg pre {
              background: #e9ecef;
-             padding: 8px;
-             border-radius: 4px;
+             padding: 10px; /* More padding */
+             border-radius: 6px; /* More rounded */
              overflow-x: auto;
-             margin: 8px 0;
+             margin: 10px 0;
+             border: 1px solid #dee2e6; /* Add border to code blocks */
         }
-        .dark .ai-msg pre {
-             background: #6c757d;
-        }
-         .ai-msg pre code { /* Reset code style inside pre */
-            background: none;
-            padding: 0;
-            border-radius: 0;
-            font-size: 1em; /* Inherit font size from pre */
-         }
-
+         .dark .ai-msg pre { border-color: #555; }
+         .ai-msg pre code { background: none; padding: 0; border-radius: 0; font-size: 1em; border: none;}
 
         /* Thinking Indicator */
         .thinking {
             display: flex;
-            align-items: center; /* Vertically align dots */
-            gap: 5px;
-            padding: 8px 12px; /* Match message padding */
-            margin: 8px 0; /* Match message margin */
-            max-width: fit-content; /* Size to content */
-            margin-right: auto; /* Align left like AI messages */
+            align-items: center;
+            gap: 6px; /* More gap */
+            padding: 10px 12px; /* Match message padding better */
+            margin: 8px 0;
+            max-width: fit-content;
+            margin-right: auto;
+            background: #f1f3f5; /* Match AI msg bg */
+            border-radius: 12px;
+            border-bottom-left-radius: 4px;
         }
-
         .dot {
-            width: 6px;
-            height: 6px;
-            background: #0d6efd;
+            width: 7px; /* Slightly larger dots */
+            height: 7px;
+            background: #adb5bd; /* Grey dots */
             border-radius: 50%;
-            animation: bounce 1.2s infinite ease-in-out; /* Added ease-in-out */
+            animation: bounce 1.3s infinite ease-in-out;
         }
-        .dot:nth-child(2) { animation-delay: 0.15s; } /* Adjusted delay */
-        .dot:nth-child(3) { animation-delay: 0.3s; } /* Adjusted delay */
+        .dot:nth-child(2) { animation-delay: 0.16s; }
+        .dot:nth-child(3) { animation-delay: 0.32s; }
 
-        /* --- Components: Footer --- */
+        /* --- Components: Footer (Fixed/Sticky) --- */
         .chat-footer {
-            padding: 10px 15px;
+            padding: 8px 10px; /* Reduced padding a bit */
             border-top: 1px solid #dee2e6;
-            background: #ffffff;
+            background: #ffffff; /* Explicit background */
+            display: flex;
+            flex-direction: column; /* Stack API key and input row */
+            gap: 5px;
+            flex-shrink: 0; /* Prevent shrinking */
+            position: sticky; /* Keep at bottom */
+            bottom: 0;
+            z-index: 10; /* Above content */
+            box-shadow: 0 -1px 3px rgba(0,0,0,0.05); /* Optional shadow */
+        }
+        .dark .chat-footer { background: #343a40; box-shadow: 0 -1px 3px rgba(0,0,0,0.2); }
+
+        .api-key-row, .input-row {
             display: flex;
             gap: 5px;
-            align-items: center;
-            flex-wrap: wrap; /* Allow wrapping */
-            flex-shrink: 0; /* Prevent footer from shrinking */
+            width: 100%; /* Take full width */
         }
 
         /* --- Components: Inputs & Buttons --- */
         input[type="text"],
         #api-key-input {
-            flex: 1; /* Take available space */
-            padding: 8px 10px; /* Adjusted padding */
+            flex-grow: 1; /* Take available space */
+            padding: 10px 12px; /* More padding for touch */
             border: 1px solid #ced4da;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease; /* Added box-shadow transition */
-            min-width: 100px; /* Minimum width to prevent excessive shrinking */
-            height: 36px; /* Fixed height for alignment */
+            border-radius: 20px; /* Pill shape */
+            font-size: 0.95rem;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            min-width: 100px;
+            height: 40px; /* Taller for touch */
+            background-color: #f1f3f5; /* Match AI msg background */
+            border: none; /* Remove border */
         }
+        .dark input[type="text"], .dark #api-key-input { background-color: #495057; }
+
 
         input:focus,
         #api-key-input:focus {
             outline: none;
-            border-color: #0d6efd;
-            box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.25); /* Focus ring */
+            /* Use box-shadow for focus instead of border */
+             box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.3);
         }
 
         button {
-            padding: 0 12px; /* Adjusted padding for consistent height */
-            height: 36px; /* Match input height */
+            padding: 0 15px; /* More horizontal padding */
+            height: 40px; /* Match input height */
             background: #0d6efd;
             color: #fff;
             border: none;
-            border-radius: 6px;
+            border-radius: 20px; /* Pill shape */
             cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 500; /* Slightly bolder button text */
-            transition: background 0.2s ease, transform 0.2s ease;
-            display: inline-flex; /* Align icon/text nicely if needed */
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: background 0.2s ease, transform 0.1s ease; /* Faster transform */
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-width: 60px;
+            flex-shrink: 0; /* Prevent buttons shrinking too much */
         }
 
         button:hover {
             background: #0a58ca;
-            transform: translateY(-1px); /* Subtle hover effect */
+            /* Remove transform on hover for app feel */
+            /* transform: translateY(-1px); */
         }
         button:active {
-             transform: translateY(0); /* Remove lift on click */
+             transform: scale(0.97); /* Slight scale down on tap */
+             background: #0a58ca;
         }
 
-        #clear-btn { background: #dc3545; }
-        #clear-btn:hover { background: #bb2d3b; }
+        #clear-btn { background: #6c757d; } /* Muted clear button */
+        #clear-btn:hover { background: #5c636a; }
+        #clear-btn:active { background: #5c636a; }
 
-        #api-btn { background: #198754; }
+
+        #api-btn { background: #198754; min-width: 80px; } /* Give "Get Key" more width */
         #api-btn:hover { background: #157347; }
+        #api-btn:active { background: #157347; }
+
 
         #file-btn {
             background: #6c757d;
-            min-width: 36px; /* Make it square-ish */
-            padding: 0; /* Remove padding as it's fixed size */
-            font-size: 1.2rem; /* Make icon slightly larger */
-            line-height: 1; /* Adjust line height for icon */
+            min-width: 40px; /* Keep it square-ish */
+            padding: 0;
+            font-size: 1.3rem; /* Larger icon */
+            line-height: 1;
+            border-radius: 50%; /* Circular button */
         }
         #file-btn:hover { background: #5c636a; }
+        #file-btn:active { background: #5c636a; }
+
+
+        #send-btn {
+            min-width: 40px; /* Make send button potentially circular if text removed */
+            padding: 0;
+            border-radius: 50%; /* Circular */
+             /* Add Send Icon (e.g., SVG or Font Awesome) inside the button in HTML if desired */
+             /* Example: Replace "Send" text with an icon */
+             font-size: 1.5rem; /* Adjust if using icon font */
+        }
 
         #file-input { display: none; }
 
         /* --- Utilities: RTL Support --- */
+        /* RTL styles should remain largely the same, check alignment */
         .rtl { direction: rtl; }
-        .rtl .message {
-            margin-left: 0;
-            margin-right: auto;
-            text-align: right; /* Default text align for RTL */
-        }
-        .rtl .user-msg {
-            margin-right: auto; /* User messages align left in RTL */
-            margin-left: 0;
-            text-align: left;
-        }
-         .rtl .ai-msg {
-            margin-left: auto; /* AI messages align right in RTL */
-            margin-right: 0;
-            text-align: right;
-         }
-         .rtl .thinking {
-             margin-left: auto;
-             margin-right: 0;
-         }
+        .rtl .message { margin-left: 0; margin-right: auto; text-align: right; }
+        .rtl .user-msg { margin-right: auto; margin-left: 0; text-align: left; border-bottom-right-radius: 12px; border-bottom-left-radius: 4px;}
+        .rtl .ai-msg { margin-left: auto; margin-right: 0; text-align: right; border-bottom-left-radius: 12px; border-bottom-right-radius: 4px;}
+        .rtl .thinking { margin-left: auto; margin-right: 0;}
+        .rtl input[type="text"], .rtl #api-key-input { /* Text input already handles RTL */ }
 
-
-        /* --- Media Queries for Mobile --- */
-        @media (max-width: 768px) {
-            body {
-                padding: 5px; /* Less padding on mobile */
-                height: -webkit-fill-available; /* Fix height on mobile safari */
-                min-height: -webkit-fill-available;
-            }
-
-            .chat-wrapper {
-                width: 100%;
-                height: 100%; /* Full height/width on mobile */
-                max-height: none; /* Remove max-height */
-                border-radius: 0; /* Edge-to-edge */
-                box-shadow: none;
-            }
-
-            .chat-header {
-                padding: 8px 10px;
-            }
-            .chat-header h1 {
-                font-size: 1rem;
-            }
-
-            .chat-body {
-                padding: 10px;
-            }
-
-            .message {
-                font-size: 0.85rem;
-                padding: 6px 10px;
-                max-width: 85%;
-            }
-
-            .api-section,
-            .chat-footer {
-                padding: 8px 10px;
-                /* Keep flex-wrap: wrap, but don't force column */
-            }
-
-            input[type="text"],
-            #api-key-input {
-                font-size: 0.85rem;
-                padding: 6px 8px;
-                height: 34px; /* Slightly smaller height */
-            }
-
-            button {
-                font-size: 0.85rem;
-                padding: 0 10px;
-                height: 34px; /* Match input */
-                min-width: 50px;
-            }
-
-            #file-btn {
-                min-width: 34px; /* Match height */
-                font-size: 1rem;
-            }
-
-            .controls {
-                gap: 3px;
-            }
-        }
 
         /* --- Animations --- */
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(8px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        /* Adjusted Bounce Animation */
         @keyframes bounce {
-            0%, 80%, 100% { transform: scale(0); }
-            40% { transform: scale(1.0); }
+            0%, 70%, 100% { transform: scale(0.5); opacity: 0.5; }
+            35% { transform: scale(1.0); opacity: 1; }
         }
 
     </style>
@@ -383,7 +335,7 @@
     <!-- Main Chat Application Wrapper -->
     <div class="chat-wrapper">
 
-        <!-- Chat Header: Title and Controls -->
+        <!-- Chat Header: Title and Controls (Sticky Top) -->
         <div class="chat-header">
             <h1 data-en="Gemma Chat" data-fa="چت نوا">Gemma Chat</h1>
             <div class="controls">
@@ -397,30 +349,37 @@
             </div>
         </div>
 
-        <!-- API Key Input Section -->
-        <div class="api-section">
-            <input type="text" id="api-key-input"
-                   placeholder="Enter OpenRouter API Key"
-                   data-en-placeholder="Enter OpenRouter API Key"
-                   data-fa-placeholder="کلید API OpenRouter را وارد کنید"
-                   value="${localStorage.getItem('apiKey') || ''}">
-            <button id="api-btn" data-en="Get Key" data-fa="دریافت کلید">Get Key</button>
-        </div>
-
-        <!-- Chat Messages Area -->
+        <!-- Chat Messages Area (Scrollable) -->
         <div class="chat-body" id="chat-body">
             <!-- Messages will be loaded here -->
         </div>
 
-        <!-- Chat Input Footer -->
+        <!-- Chat Input Footer (Sticky Bottom) -->
         <div class="chat-footer">
-            <input type="text" id="chat-input"
-                   placeholder="Type your message..."
-                   data-en-placeholder="Type your message..."
-                   data-fa-placeholder="پیام خود را تایپ کنید...">
-            <button id="file-btn" title="Attach file">📎</button>
-            <button id="send-btn">Send</button>
-            <input type="file" id="file-input" accept="image/*,application/pdf,text/plain">
+            <!-- API Key Row -->
+            <div class="api-key-row">
+                 <input type="text" id="api-key-input"
+                       placeholder="OpenRouter API Key"
+                       data-en-placeholder="OpenRouter API Key"
+                       data-fa-placeholder="کلید API OpenRouter"
+                       value="${localStorage.getItem('apiKey') || ''}">
+                <button id="api-btn" data-en="Get Key" data-fa="کلید">Key</button> <!-- Shorter Text -->
+            </div>
+            <!-- Input Row -->
+            <div class="input-row">
+                <button id="file-btn" title="Attach file">📎</button>
+                <input type="text" id="chat-input"
+                       placeholder="Type your message..."
+                       data-en-placeholder="Type your message..."
+                       data-fa-placeholder="پیام خود را تایپ کنید...">
+                <!-- Send Button (Consider using an icon) -->
+                <button id="send-btn" title="Send message">
+                     <!-- Replace text with SVG/Icon Font for better PWA look -->
+                     <!-- Example: <svg>...</svg> or <i class="fas fa-paper-plane"></i> -->
+                     ➤ <!-- Simple arrow placeholder -->
+                 </button>
+                <input type="file" id="file-input" accept="image/*,application/pdf,text/plain">
+            </div>
         </div>
 
     </div><!-- /.chat-wrapper -->
@@ -448,6 +407,7 @@
             const apiBtn = document.getElementById('api-btn');
             const sendBtn = document.getElementById('send-btn');
             const fileBtn = document.getElementById('file-btn');
+            const sendBtnElement = document.getElementById('send-btn'); // Specific ref for text change
 
             // --- Core Functions ---
 
@@ -455,113 +415,124 @@
              * Updates the UI based on the current theme and language settings.
              */
             function updateUI() {
-                // Toggle dark theme class on body
                 document.body.classList.toggle('dark', isDark);
-                // Toggle RTL class on body for Persian language
                 document.body.classList.toggle('rtl', isPersian);
 
-                // Update text content based on language
                 document.querySelectorAll('[data-en]').forEach(el => {
-                    el.textContent = isPersian ? el.getAttribute('data-fa') : el.getAttribute('data-en');
+                    // Handle buttons specifically if they contain only icons later
+                    if (el.id !== 'send-btn') { // Don't overwrite send button icon/text here
+                         el.textContent = isPersian ? el.getAttribute('data-fa') : el.getAttribute('data-en');
+                    }
                 });
 
-                // Update placeholder text based on language
                 document.querySelectorAll('[data-en-placeholder]').forEach(el => {
                     el.placeholder = isPersian ? el.getAttribute('data-fa-placeholder') : el.getAttribute('data-en-placeholder');
                 });
 
-                // Update theme button text
                 themeBtn.textContent = isDark
                     ? (isPersian ? 'روشن' : 'Light')
                     : (isPersian ? 'تاریک' : 'Dark');
-
-                 // Update language button text
                 langBtn.textContent = isPersian ? 'انگلیسی' : 'Persian';
 
-                // Ensure send button text updates immediately
-                sendBtn.textContent = isPersian ? 'ارسال' : 'Send';
+                // Update button text/content that might change based on language but isn't icon-only
+                 apiBtn.textContent = isPersian ? 'کلید' : 'Key'; // Using shorter text now
+                 clearBtn.textContent = isPersian ? (window.innerWidth < 400 ? 'پاک' : 'پاک کردن چت') : (window.innerWidth < 400 ? 'Clear' : 'Clear Chat'); // Example responsive text
+
+                 // Update Send button title/tooltip if needed
+                 sendBtnElement.title = isPersian ? 'ارسال پیام' : 'Send message';
+
+                // Update theme-color meta tag
+                const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+                if (themeColorMeta) {
+                    themeColorMeta.content = isDark ? '#343a40' : '#0d6efd';
+                }
             }
+
+
+            /**
+             * Scrolls the chat body to the bottom smoothly.
+             */
+            function scrollToBottom() {
+                // Use timeout to ensure DOM has updated after adding message/thinking
+                setTimeout(() => {
+                     chatBody.scrollTo({
+                        top: chatBody.scrollHeight,
+                        behavior: 'smooth'
+                     });
+                }, 50); // Short delay
+            }
+
 
             /**
              * Loads the conversation history from localStorage and renders messages.
              */
             function loadConversation() {
                 chatBody.innerHTML = ''; // Clear existing messages
+                let needsScroll = conversation.length > 0; // Only scroll if there are messages
+
                 conversation.forEach(msg => {
                     const isUser = msg.role === 'user';
-                    // Handle potential variations in content structure gracefully
                     let displayContent = '[Message content unavailable]';
                     if (Array.isArray(msg.content) && msg.content.length > 0) {
                          const firstPart = msg.content[0];
-                         if (firstPart.type === 'text') {
-                             displayContent = firstPart.text;
-                         } else if (firstPart.type === 'image_url') {
-                             displayContent = isPersian ? '[تصویر بارگذاری شد]' : '[Image loaded]';
-                         }
-                         // Add more conditions if other types expected
-                    } else if (typeof msg.content === 'string') { // Handle older format if necessary
-                         displayContent = msg.content;
-                    }
-                    addMessage(displayContent, isUser, false); // Add message without animation on load
+                         if (firstPart.type === 'text') { displayContent = firstPart.text; }
+                         else if (firstPart.type === 'image_url') { displayContent = isPersian ? '[تصویر بارگذاری شد]' : '[Image loaded]'; }
+                    } else if (typeof msg.content === 'string') { displayContent = msg.content; }
+                    addMessage(displayContent, isUser, false); // Add message without animation/scroll on load
                 });
-                apiKeyInput.value = apiKey; // Set API key input value
-                updateUI(); // Apply theme and language
-                // Scroll to bottom after loading (give a slight delay for rendering)
-                setTimeout(() => {
-                     chatBody.scrollTop = chatBody.scrollHeight;
-                }, 50);
+                apiKeyInput.value = apiKey;
+                updateUI();
+
+                // Scroll to bottom only after loading everything and if needed
+                if (needsScroll) {
+                    setTimeout(() => {
+                         chatBody.scrollTop = chatBody.scrollHeight; // Instant scroll on load
+                    }, 100); // Slightly longer delay on load
+                }
             }
 
             /**
              * Adds a message bubble to the chat body.
              * @param {string} content - The message text or description.
              * @param {boolean} [isUser=false] - True if the message is from the user.
-             * @param {boolean} [animate=true] - True to scroll the message into view.
+             * @param {boolean} [shouldScroll=true] - True to scroll the new message into view.
              */
-            function addMessage(content, isUser = false, animate = true) {
+            function addMessage(content, isUser = false, shouldScroll = true) {
                 const msgDiv = document.createElement('div');
                 msgDiv.className = `message ${isUser ? 'user-msg' : 'ai-msg'}`;
 
                 if (isUser) {
-                    // For user messages, just set text content to avoid XSS risks if content isn't sanitized
                     msgDiv.textContent = content;
                 } else {
-                    // For AI messages, parse Markdown content
-                    // Ensure marked is loaded before calling parse
                     if (typeof marked !== 'undefined') {
-                         // Configure marked to add breaks for newlines
-                         marked.setOptions({ breaks: true });
-                         msgDiv.innerHTML = marked.parse(content || ''); // Use empty string if content is null/undefined
+                         marked.setOptions({ breaks: true, gfm: true }); // Enable GitHub Flavored Markdown
+                         msgDiv.innerHTML = marked.parse(content || '');
                     } else {
                          console.error("Marked library not loaded.");
-                         msgDiv.textContent = content; // Fallback to text content
+                         msgDiv.textContent = content;
                     }
                 }
 
                 chatBody.appendChild(msgDiv);
 
-                // Scroll to the bottom to show the new message
-                if (animate) {
-                     chatBody.scrollTop = chatBody.scrollHeight;
+                if (shouldScroll) {
+                    scrollToBottom(); // Use the dedicated scroll function
                 }
             }
 
             /**
-             * Adds a "thinking" animation to indicate the AI is processing.
+             * Adds a "thinking" animation.
              * @returns {HTMLElement} The thinking indicator element.
              */
             function addThinking() {
-                // Remove existing thinking indicator if any
                  const existingThinking = chatBody.querySelector('.thinking');
-                 if(existingThinking) {
-                     removeThinking(existingThinking);
-                 }
+                 if(existingThinking) { removeThinking(existingThinking); }
 
                 const thinkingDiv = document.createElement('div');
-                thinkingDiv.className = 'thinking ai-msg'; // Style like an AI message but with thinking class
+                thinkingDiv.className = 'thinking'; // Removed ai-msg class styling is separate now
                 thinkingDiv.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
                 chatBody.appendChild(thinkingDiv);
-                chatBody.scrollTop = chatBody.scrollHeight; // Scroll to show indicator
+                scrollToBottom();
                 return thinkingDiv;
             }
 
@@ -576,7 +547,7 @@
             }
 
             /**
-             * Saves the current state (conversation, API key, theme, lang) to localStorage.
+             * Saves the current state to localStorage.
              */
             function saveState() {
                 try {
@@ -586,7 +557,6 @@
                     localStorage.setItem('lang', isPersian ? 'fa' : 'en');
                 } catch (e) {
                     console.error("Error saving state to localStorage:", e);
-                    // Optionally notify the user that settings might not be saved
                     addMessage(isPersian ? "خطا در ذخیره وضعیت چت." : "Error saving chat state.", false);
                 }
             }
@@ -597,6 +567,7 @@
              * @returns {Promise<string>} A promise resolving with the Base64 data URL.
              */
             function getBase64(file) {
+                // Same as before
                 return new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.readAsDataURL(file);
@@ -610,37 +581,39 @@
              * @param {File} [file=null] - An optional file to upload.
              */
             async function sendMessage(file = null) {
-                if (isTyping) return; // Prevent concurrent requests
+                if (isTyping) return;
 
-                apiKey = apiKeyInput.value.trim(); // Get current API key value
+                apiKey = apiKeyInput.value.trim();
                 const messageText = chatInput.value.trim();
 
-                // --- Input Validation ---
                 if (!apiKey) {
                     addMessage(isPersian ? 'لطفاً کلید API OpenRouter معتبر خود را وارد کنید.' : 'Please enter your valid OpenRouter API key.', false);
-                    return; // Stop if no API key
+                    apiKeyInput.focus(); // Focus the API key input
+                    return;
                 }
                 if (!messageText && !file) {
-                    return; // Stop if no message text and no file
+                    return;
                 }
 
-                isTyping = true; // Set typing flag
-                sendBtn.disabled = true; // Disable send button
-                chatInput.disabled = true; // Disable text input
-                fileBtn.disabled = true; // Disable file button
+                isTyping = true;
+                sendBtn.disabled = true;
+                chatInput.disabled = true;
+                fileBtn.disabled = true;
+                apiKeyInput.disabled = true; // Disable API key input during request
 
-                const thinkingIndicator = addThinking(); // Show thinking indicator
+
+                let thinkingIndicator; // Declare here
 
                 // --- Prepare Message Payload ---
                 let currentMessageContent = [];
-                let userDisplayMessage = ""; // What to show in the user's bubble
+                let userDisplayMessageAdded = false; // Track if user message bubble was added
 
                 // Handle text message part
                 if (messageText) {
                     currentMessageContent.push({ type: 'text', text: messageText });
-                    userDisplayMessage = messageText;
                     addMessage(messageText, true); // Add user text message immediately
-                    chatInput.value = ''; // Clear input field
+                    userDisplayMessageAdded = true;
+                    chatInput.value = '';
                 }
 
                 // Handle file part
@@ -654,49 +627,49 @@
                              currentMessageContent.push({ type: 'image_url', image_url: { url: base64Data } });
                              fileDescription = isPersian ? `[تصویر ارسال شد: ${file.name}]` : `[Image sent: ${file.name}]`;
                         } else if (fileType === 'application/pdf' || fileType === 'text/plain') {
-                            // Note: Sending large file content directly in 'text' might exceed limits.
-                            // This example sends the base64 data as text, which the model might not interpret well.
-                            // A better approach might involve summarizing or extracting text first if possible.
-                            // For now, we'll just indicate the file was "uploaded".
-                            currentMessageContent.push({ type: 'text', text: `[User uploaded file: ${file.name}, type: ${fileType}]` }); // More informative text for the AI
+                            currentMessageContent.push({ type: 'text', text: `[User uploaded file: ${file.name}, type: ${fileType}]` });
                              fileDescription = isPersian ? `[فایل ارسال شد: ${file.name}]` : `[File sent: ${file.name}]`;
                         } else {
                             addMessage(isPersian ? `نوع فایل پشتیبانی نمی‌شود: ${fileType}` : `Unsupported file type: ${fileType}`, false);
-                            removeThinking(thinkingIndicator);
+                            // No thinking indicator added yet, just reset state
                             isTyping = false;
                             sendBtn.disabled = false;
                             chatInput.disabled = false;
                             fileBtn.disabled = false;
-                            return; // Stop if file type is unsupported
+                            apiKeyInput.disabled = false;
+                            return;
                         }
 
-                        // Add a combined message bubble if both text and file were sent, or just the file description
-                        if (!messageText && fileDescription) {
+                        // Add a message bubble *only* for the file if no text was sent
+                        if (!userDisplayMessageAdded && fileDescription) {
                              addMessage(fileDescription, true);
-                        } else if (messageText && fileDescription) {
-                             // Message bubble already added for text, maybe add file info separately?
-                             // Or update the existing user message? For simplicity, we'll rely on the text bubble.
+                             userDisplayMessageAdded = true; // Mark that a user bubble was shown
+                        } else {
                              console.log("File sent along with text message:", file.name);
                         }
 
-                        fileInput.value = ''; // Clear the file input
+                        fileInput.value = '';
 
                     } catch (error) {
                         console.error("File processing error:", error);
                         addMessage(isPersian ? `خطا در پردازش فایل: ${error.message}` : `File processing error: ${error.message}`, false);
-                        removeThinking(thinkingIndicator);
+                        // Reset state if error occurs during file processing
                         isTyping = false;
                         sendBtn.disabled = false;
                         chatInput.disabled = false;
                         fileBtn.disabled = false;
-                        return; // Stop on file error
+                        apiKeyInput.disabled = false;
+                        return;
                     }
                 }
+
+                // Add thinking indicator *after* user message is prepared/added
+                thinkingIndicator = addThinking();
 
                 // Add the complete user message structure to conversation history
                 const userMsg = { role: 'user', content: currentMessageContent };
                 conversation.push(userMsg);
-                saveState(); // Save updated conversation
+                saveState();
 
                 // --- API Call ---
                 try {
@@ -705,27 +678,23 @@
                         headers: {
                             'Authorization': `Bearer ${apiKey}`,
                             'Content-Type': 'application/json',
-                            // Recommended headers for OpenRouter identification
-                            'HTTP-Referer': window.location.href, // Replace with your actual site URL if deployed
-                            'X-Title': 'Gemma Chat', // Replace with your app's name
+                            'HTTP-Referer': window.location.origin, // Use origin
+                            'X-Title': 'Gemma Chat PWA', // Updated title
                         },
                         body: JSON.stringify({
-                            model: 'google/gemma-3-27b-it:free', // Or specify another model
-                            messages: conversation, // Send the whole conversation history
-                            // stream: false // Set to true for streaming responses (would require different handling)
+                            model: 'google/gemma-3-27b-it:free',
+                            messages: conversation,
                         }),
                     });
 
-                    removeThinking(thinkingIndicator); // Remove indicator once response starts processing
+                    removeThinking(thinkingIndicator); // Remove indicator
 
                     if (!response.ok) {
-                        // Try to parse error details from OpenRouter's response
                         let errorDetails = `API Error (${response.status})`;
                         try {
                             const errorData = await response.json();
                             errorDetails += `: ${errorData.error?.message || response.statusText}`;
                         } catch (jsonError) {
-                            // Fallback if the error response isn't JSON
                             errorDetails += `: ${await response.text()}`;
                         }
                         throw new Error(errorDetails);
@@ -733,91 +702,82 @@
 
                     const data = await response.json();
 
-                    // Extract AI response content
                     if (data.choices && data.choices.length > 0 && data.choices[0].message) {
                         const aiContent = data.choices[0].message.content;
-                        // Add AI response to chat and history
-                        const aiMsg = { role: 'assistant', content: [{ type: 'text', text: aiContent }] }; // Assuming AI response is always text
+                        const aiMsg = { role: 'assistant', content: [{ type: 'text', text: aiContent }] };
                         conversation.push(aiMsg);
-                        addMessage(aiContent, false); // Add AI message to display
-                        saveState(); // Save updated conversation with AI response
+                        addMessage(aiContent, false); // Add AI message (will scroll)
+                        saveState();
                     } else {
                         throw new Error("Invalid response structure received from API.");
                     }
 
                 } catch (error) {
                     console.error("API Request Error:", error);
-                    removeThinking(thinkingIndicator); // Ensure indicator is removed on error
+                    if (thinkingIndicator) removeThinking(thinkingIndicator); // Ensure removed on error
                     addMessage(isPersian ? `خطا در ارتباط با سرور: ${error.message}` : `Error communicating with server: ${error.message}`, false);
                 } finally {
                     // --- Reset State ---
-                    isTyping = false; // Reset typing flag
-                    sendBtn.disabled = false; // Re-enable send button
-                    chatInput.disabled = false; // Re-enable input
-                    fileBtn.disabled = false; // Re-enable file button
-                    chatInput.focus(); // Focus input for next message
+                    isTyping = false;
+                    sendBtn.disabled = false;
+                    chatInput.disabled = false;
+                    fileBtn.disabled = false;
+                    apiKeyInput.disabled = false; // Re-enable API key input
+                    chatInput.focus();
                 }
             }
 
             // --- Event Listeners ---
 
-            // Send message on button click
             sendBtn.addEventListener('click', () => sendMessage());
-
-            // Send message on Enter key press in input field
             chatInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) { // Send on Enter, allow Shift+Enter for newline
-                    e.preventDefault(); // Prevent default newline insertion
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
                     sendMessage();
                 }
             });
 
-            // Trigger file input click when file button is clicked
-            fileBtn.addEventListener('click', () => {
-                fileInput.click();
-            });
-
-            // Send message with file when a file is selected
+            fileBtn.addEventListener('click', () => { fileInput.click(); });
             fileInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
-                if (file) {
-                    sendMessage(file); // Call send message with the selected file
-                }
+                if (file) { sendMessage(file); }
             });
 
-            // Clear chat history
             clearBtn.addEventListener('click', () => {
                 if (confirm(isPersian ? "آیا مطمئن هستید که می‌خواهید کل تاریخچه چت را پاک کنید؟" : "Are you sure you want to clear the entire chat history?")) {
-                     conversation = []; // Clear conversation array
-                     chatBody.innerHTML = ''; // Clear messages from UI
-                     localStorage.removeItem('conversation'); // Remove from storage
-                     // Optionally keep other settings like API key, theme, lang
-                     saveState(); // Save the empty state (or just update storage)
+                     conversation = [];
+                     chatBody.innerHTML = ''; // Clear messages
+                     localStorage.removeItem('conversation');
+                     saveState(); // Save empty state
                 }
             });
 
-            // Toggle theme
             themeBtn.addEventListener('click', () => {
                 isDark = !isDark;
                 updateUI();
                 saveState();
             });
 
-            // Toggle language
             langBtn.addEventListener('click', () => {
                 isPersian = !isPersian;
                 updateUI();
                 saveState();
             });
 
-            // Open OpenRouter keys page
             apiBtn.addEventListener('click', () => {
                 window.open('https://openrouter.ai/settings/keys', '_blank', 'noopener noreferrer');
             });
 
             // --- Initialization ---
-            // Load conversation and apply settings when the page loads
             window.addEventListener('load', loadConversation);
+
+            // Optional: Update UI on resize (e.g., for responsive button text)
+             let resizeTimeout;
+             window.addEventListener('resize', () => {
+                 clearTimeout(resizeTimeout);
+                 resizeTimeout = setTimeout(updateUI, 150); // Debounce resize updates
+             });
+
 
         })(); // End of IIFE
     </script>
